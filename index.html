@@ -598,6 +598,8 @@
                 'alert-no-parts': 'Please add parts first',
                 'alert-no-plan': 'No cutting plan to export',
                 'excel-loaded': 'Parts loaded from Excel file',
+                'excel-error': 'Error reading Excel file',
+                'excel-no-data': 'No valid data found in Excel file',
                 
                 // Theme and language
                 'dark-mode': 'Dark Mode',
@@ -667,6 +669,8 @@
                 'alert-no-parts': 'يرجى إضافة قطع أولاً',
                 'alert-no-plan': 'لا توجد خطة قطع لتصديرها',
                 'excel-loaded': 'تم تحميل القطع من ملف Excel',
+                'excel-error': 'خطأ في قراءة ملف Excel',
+                'excel-no-data': 'لم يتم العثور على بيانات صالحة في ملف Excel',
                 
                 // Theme and language
                 'dark-mode': 'الوضع الليلي',
@@ -840,45 +844,78 @@
             }
         }
         
-        // Handle Excel file upload
+        // Handle Excel file upload - CORRECTED VERSION
         function handleExcelFile(event) {
             const file = event.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                // Assume the first sheet contains the data
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                
-                // Convert data to app format
-                parts = [];
-                jsonData.forEach(row => {
-                    // Look for appropriate columns (flexible for language)
-                    const name = row['Name'] || row['name'] || row['الاسم'] || '';
-                    const quantity = row['Quantity'] || row['quantity'] || row['العدد'] || 1;
-                    const length = row['Length'] || row['length'] || row['الطول'] || 0;
-                    const width = row['Width'] || row['width'] || row['العرض'] || 0;
-                    const thickness = row['Thickness'] || row['thickness'] || row['السمك'] || 0;
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
                     
-                    if (name && length > 0 && width > 0) {
-                        parts.push({
-                            id: Date.now() + Math.random(),
-                            name,
-                            quantity: parseInt(quantity) || 1,
-                            length: parseInt(length),
-                            width: parseInt(width),
-                            thickness: parseFloat(thickness) || 1
-                        });
+                    // Assume the first sheet contains the data
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    if (jsonData.length === 0) {
+                        alert(isEnglish ? translations.en['excel-no-data'] : translations.ar['excel-no-data']);
+                        return;
                     }
-                });
-                
-                updatePartsList();
-                alert(isEnglish ? translations.en['excel-loaded'] : translations.ar['excel-loaded']);
+                    
+                    // Convert data to app format
+                    const newParts = [];
+                    jsonData.forEach((row, index) => {
+                        // Normalize column names to handle different naming conventions
+                        const normalizedRow = {};
+                        Object.keys(row).forEach(key => {
+                            const normalizedKey = key.toLowerCase().trim();
+                            normalizedRow[normalizedKey] = row[key];
+                        });
+                        
+                        // Try to extract data with flexible column names
+                        const name = normalizedRow.name || normalizedRow['الاسم'] || normalizedRow.part || `Part ${index + 1}`;
+                        const quantity = normalizedRow.quantity || normalizedRow['العدد'] || normalizedRow.qty || 1;
+                        const length = normalizedRow.length || normalizedRow['الطول'] || normalizedRow.l || 0;
+                        const width = normalizedRow.width || normalizedRow['العرض'] || normalizedRow.w || 0;
+                        const thickness = normalizedRow.thickness || normalizedRow['السمك'] || normalizedRow.t || 1;
+                        
+                        // Validate required data
+                        if (length > 0 && width > 0) {
+                            newParts.push({
+                                id: Date.now() + index,
+                                name: name.toString(),
+                                quantity: parseInt(quantity) || 1,
+                                length: parseInt(length),
+                                width: parseInt(width),
+                                thickness: parseFloat(thickness) || 1
+                            });
+                        }
+                    });
+                    
+                    if (newParts.length === 0) {
+                        alert(isEnglish ? translations.en['excel-no-data'] : translations.ar['excel-no-data']);
+                        return;
+                    }
+                    
+                    // Add new parts to the existing list
+                    parts = [...parts, ...newParts];
+                    updatePartsList();
+                    alert(isEnglish ? translations.en['excel-loaded'] : translations.ar['excel-loaded']);
+                    
+                    // Reset file input to allow uploading the same file again if needed
+                    event.target.value = '';
+                } catch (error) {
+                    console.error('Error processing Excel file:', error);
+                    alert(isEnglish ? translations.en['excel-error'] : translations.ar['excel-error']);
+                }
             };
+            
+            reader.onerror = function() {
+                alert(isEnglish ? translations.en['excel-error'] : translations.ar['excel-error']);
+            };
+            
             reader.readAsArrayBuffer(file);
         }
         
