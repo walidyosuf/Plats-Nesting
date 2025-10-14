@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sheet Metal Cutting Planner</title>
+    <title>خطة قطع الصاج</title>
+    <!-- Include the SheetJS library for Excel file reading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary-color: #2c3e50;
             --secondary-color: #3498db;
             --accent-color: #e74c3c;
+            --success-color: #27ae60;
             --light-color: #ecf0f1;
             --dark-color: #34495e;
             --bg-color: #f5f7fa;
@@ -17,11 +20,11 @@
             --border-color: #ddd;
             --shadow-color: rgba(0, 0, 0, 0.1);
         }
-
         .dark-mode {
             --primary-color: #34495e;
             --secondary-color: #3498db;
             --accent-color: #e74c3c;
+            --success-color: #2ecc71;
             --light-color: #2c3e50;
             --dark-color: #ecf0f1;
             --bg-color: #1a1a1a;
@@ -30,45 +33,45 @@
             --border-color: #444;
             --shadow-color: rgba(0, 0, 0, 0.3);
         }
-        
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            transition: background-color 0.3s, color 0.3s;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
-        
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
             line-height: 1.6;
+            font-size: 16px;
         }
-        
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
-        
         header {
             background-color: var(--primary-color);
             color: white;
-            padding: 1rem 0;
+            padding: 1rem;
             text-align: center;
-            border-radius: 8px 8px 0 0;
+            border-radius: 8px;
             margin-bottom: 20px;
             position: relative;
         }
-        
         .header-controls {
             position: absolute;
-            top: 15px;
+            top: 50%;
+            transform: translateY(-50%);
             right: 20px;
             display: flex;
             gap: 15px;
         }
-        
+        body[dir="rtl"] .header-controls {
+            right: auto;
+            left: 20px;
+        }
         .control-btn {
             background: rgba(255, 255, 255, 0.2);
             border: none;
@@ -81,67 +84,45 @@
             align-items: center;
             gap: 5px;
         }
-        
         .control-btn:hover {
             background: rgba(255, 255, 255, 0.3);
         }
-        
         h1 {
             font-size: 1.8rem;
-            margin-bottom: 10px;
+            margin: 0;
         }
-        
-        .description {
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-        
         .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
-            margin-bottom: 20px;
         }
-        
-        @media (max-width: 768px) {
+        @media (max-width: 1100px) {
             .main-content {
                 grid-template-columns: 1fr;
             }
-            
-            .header-controls {
-                position: static;
-                justify-content: center;
-                margin-top: 15px;
-            }
         }
-        
         .card {
             background: var(--card-bg);
             border-radius: 8px;
             box-shadow: 0 4px 6px var(--shadow-color);
             padding: 20px;
-            margin-bottom: 20px;
             border: 1px solid var(--border-color);
         }
-        
         .card-title {
             font-size: 1.3rem;
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 1px solid var(--border-color);
-            color: var(--primary-color);
+            color: var(--secondary-color);
         }
-        
         .form-group {
             margin-bottom: 15px;
         }
-        
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: 600;
         }
-        
         input, select, button {
             width: 100%;
             padding: 10px;
@@ -151,1116 +132,1334 @@
             background-color: var(--card-bg);
             color: var(--text-color);
         }
-        
+        input:focus, select:focus {
+            outline: 2px solid var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
         button {
             background-color: var(--secondary-color);
             color: white;
             border: none;
             cursor: pointer;
-            transition: background-color 0.3s;
             font-weight: 600;
         }
-        
         button:hover {
-            background-color: #2980b9;
+            opacity: 0.9;
         }
-        
-        .btn-danger {
-            background-color: var(--accent-color);
+        .btn-danger { background-color: var(--accent-color); }
+        .btn-success { background-color: var(--success-color); }
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        
-        .btn-danger:hover {
-            background-color: #c0392b;
+        #add-part-container {
+            grid-column: 1 / -1;
         }
-        
-        .btn-success {
-            background-color: #27ae60;
+        .full-width-input {
+            grid-column: 1 / -1;
         }
-        
-        .btn-success:hover {
-            background-color: #219653;
+        .table-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
         }
-        
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
         }
-        
         th, td {
-            padding: 12px 15px;
+            padding: 10px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
         }
-        
+        body[dir="rtl"] th, body[dir="rtl"] td {
+            text-align: right;
+        }
         th {
             background-color: var(--light-color);
-            font-weight: 600;
+            position: sticky;
+            top: 0;
         }
-        
-        tr:hover {
-            background-color: rgba(0, 0, 0, 0.05);
+        .actions-cell button {
+            padding: 4px 8px;
+            font-size: 0.8rem;
         }
-        
-        .dark-mode tr:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-        
-        .sheet-info {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .sheet-info input {
-            flex: 1;
-        }
-        
-        .canvas-container {
-            width: 100%;
-            height: 400px;
-            border: 1px solid var(--border-color);
-            margin-top: 20px;
-            overflow: auto;
-            background-color: var(--light-color);
-        }
-        
-        canvas {
-            display: block;
-            margin: 0 auto;
-        }
-        
-        .actions {
+        .card-actions {
             display: flex;
             gap: 10px;
             margin-top: 20px;
         }
-        
-        .actions button {
-            flex: 1;
-        }
-        
-        .result-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-top: 20px;
-        }
-        
-        .stat-box {
-            background-color: var(--light-color);
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-        
-        .stat-label {
-            font-size: 0.9rem;
-            color: #7f8c8d;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .file-input-container {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-            width: 100%;
-        }
-        
-        .file-input-container input[type=file] {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        
         .file-input-label {
             display: block;
             padding: 10px;
             background: var(--light-color);
-            border: 1px dashed var(--secondary-color);
+            border: 2px dashed var(--secondary-color);
             border-radius: 4px;
             text-align: center;
             cursor: pointer;
         }
-        
-        .file-input-label:hover {
-            background: #dfe6e9;
-        }
-        
-        .dark-mode .file-input-label:hover {
-            background: #3d4c5a;
-        }
-        
-        .instructions {
-            background-color: #fff9e6;
-            border-left: 4px solid #f1c40f;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 0 4px 4px 0;
-        }
-        
-        .dark-mode .instructions {
-            background-color: #3d3a2a;
-            border-left-color: #f39c12;
-        }
-        
-        .instructions h3 {
-            margin-bottom: 10px;
-            color: #d35400;
-        }
-        
-        .instructions ul {
-            padding-left: 20px;
-        }
-        
-        .instructions li {
-            margin-bottom: 8px;
-        }
-        
-        .color-legend {
+        .file-input-label:hover { background: var(--border-color); }
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
             display: flex;
-            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        .modal-content p { margin-bottom: 20px; }
+        .modal-actions { display: flex; justify-content: center; gap: 15px; }
+        .modal-actions button { width: 100px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: var(--light-color);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--dark-color);
+        }
+        .export-options {
+            display: flex;
             gap: 10px;
             margin-top: 15px;
         }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-right: 10px;
-        }
-        
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            margin-right: 5px;
-            border: 1px solid #ccc;
-        }
-        
-        /* RTL Support */
-        body[dir="rtl"] {
-            text-align: right;
-        }
-        
-        body[dir="rtl"] th, 
-        body[dir="rtl"] td {
-            text-align: right;
-        }
-        
-        body[dir="rtl"] .instructions ul {
-            padding-left: 0;
-            padding-right: 20px;
-        }
-        
-        body[dir="rtl"] .instructions {
-            border-left: none;
-            border-right: 4px solid #f1c40f;
-        }
-        
-        body[dir="rtl"] .dark-mode .instructions {
-            border-right: 4px solid #f39c12;
-        }
-        
-        body[dir="rtl"] .header-controls {
-            right: auto;
-            left: 20px;
-        }
-        
-        body[dir="rtl"] .legend-item {
-            margin-right: 0;
-            margin-left: 10px;
-        }
-        
-        body[dir="rtl"] .legend-color {
-            margin-right: 0;
-            margin-left: 5px;
+        .export-options button {
+            flex: 1;
         }
     </style>
 </head>
-<body dir="ltr">
+<body>
     <div class="container">
         <header>
-            <h1 id="app-title">Sheet Metal Cutting Planner</h1>
-            <p class="description" id="app-description">Upload cutting data from Excel or enter manually, then generate the optimal cutting plan</p>
-            
+            <h1 id="app-title">خطة قطع الصاج</h1>
             <div class="header-controls">
                 <button class="control-btn" id="theme-toggle">
                     <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
                 </button>
                 <button class="control-btn" id="language-toggle">
-                    <span id="language-icon">🌐</span> <span id="language-text">العربية</span>
+                    <span id="language-icon">🌐</span> <span id="language-text">English</span>
                 </button>
             </div>
         </header>
-        
-        <div class="instructions">
-            <h3 id="instructions-title">Usage Instructions:</h3>
-            <ul>
-                <li id="instruction-1">You can enter cutting data manually or upload from Excel file</li>
-                <li id="instruction-2">Excel file should contain these columns: "Name", "Quantity", "Length", "Width", "Thickness"</li>
-                <li id="instruction-3">Set the base sheet dimensions before generating the cutting plan</li>
-                <li id="instruction-4">You can export the cutting plan as image or save the data</li>
-            </ul>
-        </div>
-        
         <div class="main-content">
             <div class="input-section">
                 <div class="card">
-                    <h2 class="card-title" id="input-title">Enter Cutting Data</h2>
-                    
+                    <h2 class="card-title" id="input-title">إدخال بيانات القطع</h2>
                     <div class="form-group">
-                        <label id="excel-label">Upload from Excel file:</label>
-                        <div class="file-input-container">
-                            <input type="file" id="excel-file" accept=".xlsx, .xls">
-                            <label for="excel-file" class="file-input-label" id="excel-button">Choose Excel File</label>
-                        </div>
+                        <label id="excel-label">تحميل من Excel</label>
+                        <input type="file" id="excel-file" accept=".xlsx, .xls" style="display: none;">
+                        <label for="excel-file" class="file-input-label" id="excel-button">اختر ملف Excel</label>
                     </div>
-                    
-                    <div class="form-group">
-                        <label id="manual-label">Or enter data manually:</label>
-                        <div class="form-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <input type="text" id="part-name" placeholder="Part Name">
-                            <input type="number" id="part-quantity" placeholder="Quantity" min="1" value="1">
+                    <h3 id="manual-label" style="text-align: center; margin: 15px 0; font-size: 1rem; color: #7f8c8d;">أو أدخل يدويًا</h3>
+                    <div class="input-grid">
+                        <div class="form-group full-width-input">
+                            <input type="text" id="part-name" placeholder="اسم القطعة">
                         </div>
-                        <div class="form-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
-                            <input type="number" id="part-length" placeholder="Length (mm)" min="1">
-                            <input type="number" id="part-width" placeholder="Width (mm)" min="1">
+                        <div class="form-group full-width-input">
+                            <input type="text" id="part-steel-type" placeholder="نوع الصلب">
                         </div>
-                        <div class="form-row" style="display: flex; gap: 10px;">
-                            <input type="number" id="part-thickness" placeholder="Thickness (mm)" min="0.1" step="0.1">
-                            <button id="add-part" class="btn-success">Add Part</button>
+                        <div class="form-group">
+                            <input type="number" id="part-quantity" placeholder="العدد" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                            <input type="number" id="part-length" placeholder="الطول (مم)" min="1">
+                        </div>
+                        <div class="form-group">
+                            <input type="number" id="part-width" placeholder="العرض (مم)" min="1">
+                        </div>
+                        <div class="form-group">
+                            <input type="number" id="part-thickness" placeholder="السمك (مم)" min="0.1" step="0.1">
+                        </div>
+                        <div class="form-group" id="add-part-container">
+                            <button id="add-part" class="btn-success">إضافة قطعة</button>
                         </div>
                     </div>
                 </div>
-                
                 <div class="card">
-                    <h2 class="card-title" id="parts-title">Added Parts</h2>
+                    <h2 class="card-title" id="parts-title">القطع المضافة</h2>
                     <div class="table-container">
                         <table id="parts-table">
                             <thead>
                                 <tr>
-                                    <th id="th-name">Name</th>
-                                    <th id="th-quantity">Quantity</th>
-                                    <th id="th-length">Length</th>
-                                    <th id="th-width">Width</th>
-                                    <th id="th-thickness">Thickness</th>
-                                    <th id="th-actions">Actions</th>
+                                    <th id="th-name">الاسم</th>
+                                    <th id="th-steel-type">نوع الصلب</th>
+                                    <th id="th-quantity">عدد</th>
+                                    <th id="th-length">طول</th>
+                                    <th id="th-width">عرض</th>
+                                    <th id="th-thickness">سمك</th>
+                                    <th id="th-actions">إجراءات</th>
                                 </tr>
                             </thead>
-                            <tbody id="parts-list">
-                                <!-- Will be filled with data -->
-                            </tbody>
+                            <tbody id="parts-list"></tbody>
                         </table>
                     </div>
-                    <div class="actions">
-                        <button id="clear-parts" class="btn-danger">Clear All</button>
+                    <div class="card-actions">
+                        <button id="clear-parts" class="btn-danger">مسح الكل</button>
                     </div>
-                </div>
-                
-                <div class="card">
-                    <h2 class="card-title" id="settings-title">Sheet Settings</h2>
-                    <div class="sheet-info">
-                        <div class="form-group" style="flex: 1;">
-                            <label id="sheet-length-label">Sheet Length (mm)</label>
-                            <input type="number" id="sheet-length" value="2000" min="100">
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label id="sheet-width-label">Sheet Width (mm)</label>
-                            <input type="number" id="sheet-width" value="1000" min="100">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label id="margin-label">Cutting Margin (mm)</label>
-                        <input type="number" id="cut-margin" value="5" min="0">
-                    </div>
-                    <button id="generate-plan">Generate Cutting Plan</button>
                 </div>
             </div>
-            
             <div class="output-section">
                 <div class="card">
-                    <h2 class="card-title" id="plan-title">Cutting Plan</h2>
-                    <div class="canvas-container">
-                        <canvas id="cutting-canvas"></canvas>
-                    </div>
-                    
-                    <div class="color-legend" id="color-legend">
-                        <!-- Will be filled with colors -->
-                    </div>
-                    
-                    <div class="result-stats">
-                        <div class="stat-box">
-                            <div class="stat-value" id="utilization-rate">0%</div>
-                            <div class="stat-label" id="utilization-label">Utilization Rate</div>
+                    <h2 class="card-title" id="settings-title">الإعدادات وتوليد الخطة</h2>
+                    <div class="input-grid">
+                        <div class="form-group">
+                            <label id="sheet-length-label">طول اللوح (مم)</label>
+                            <input type="number" id="sheet-length" value="6000" min="100">
                         </div>
-                        <div class="stat-box">
-                            <div class="stat-value" id="sheets-used">0</div>
-                            <div class="stat-label" id="sheets-label">Sheets Used</div>
+                        <div class="form-group">
+                            <label id="sheet-width-label">عرض اللوح (مم)</label>
+                            <input type="number" id="sheet-width" value="1500" min="100">
                         </div>
-                        <div class="stat-box">
+                        <div class="form-group form-switch">
+                            <label for="allow-rotation" id="rotation-label">السماح بالتدوير</label>
+                            <input type="checkbox" id="allow-rotation" checked style="width: auto; height: auto;">
+                        </div>
+                    </div>
+                    <button id="generate-plan" style="width: 100%; padding: 12px; font-size: 1.1rem; margin-top: 10px;">إنشاء خطة القطع</button>
+                </div>
+                <div class="card">
+                    <h2 class="card-title" id="plan-title">ملخص خطة القطع</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="total-sheets">0</div>
+                            <div class="stat-label">إجمالي الألواح</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="material-usage">0%</div>
+                            <div class="stat-label">كفاءة الاستخدام</div>
+                        </div>
+                        <div class="stat-card">
                             <div class="stat-value" id="waste-area">0</div>
-                            <div class="stat-label" id="waste-label">Waste Area (mm²)</div>
+                            <div class="stat-label">المساحة المهدرة (م²)</div>
                         </div>
                     </div>
-                    
-                    <div class="actions">
-                        <button id="export-image" class="btn-success">Export as Image</button>
-                        <button id="export-data">Export Data</button>
+                    <div class="table-container">
+                        <table id="summary-table">
+                            <thead>
+                                <tr>
+                                    <th id="th-sheet-num">رقم اللوح</th>
+                                    <th id="th-steel-type">نوع الصلب</th>
+                                    <th id="th-thickness">السمك</th>
+                                    <th id="th-part-name">اسم القطعة</th>
+                                    <th id="th-dimensions">الأبعاد</th>
+                                    <th id="th-qty-on-sheet">العدد باللوح</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-list"></tbody>
+                        </table>
+                    </div>
+                    <div class="export-options">
+                        <button id="export-summary" class="btn-success">تصدير الملخص</button>
+                        <button id="export-stock" class="btn-success">بيان الصرف</button>
+                        <button id="export-returns" class="btn-danger">بيان الارتجاعات</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <p id="modal-text"></p>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="btn-danger">تأكيد</button>
+                <button id="modal-cancel" class="btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- STATE MANAGEMENT ---
+    let parts = [];
+    let cuttingPlan = [];
+    let stockStatement = [];
+    let returnsStatement = [];
+    let currentPage = 0;
+    let isDarkMode = localStorage.getItem('darkMode') === 'true';
+    let isEnglish = localStorage.getItem('language') === 'en';
+    
+    // --- TRANSLATIONS ---
+    const translations = {
+        en: { 
+            'app-title': 'Sheet Metal Cutting Plan', 
+            'theme-text': 'Dark Mode', 
+            'language-text': 'العربية', 
+            'input-title': 'Enter Cutting Data', 
+            'excel-label': 'Upload from Excel', 
+            'excel-button': 'Choose Excel File', 
+            'manual-label': 'Or Enter Manually', 
+            'part-name': 'Part Name', 
+            'part-steel-type': 'Steel Type', 
+            'quantity': 'Quantity', 
+            'length': 'Length', 
+            'width': 'Width', 
+            'thickness': 'Thickness', 
+            'add-part': 'Add Part', 
+            'parts-title': 'Added Parts', 
+            'th-name': 'Name', 
+            'th-steel-type': 'Steel Type', 
+            'th-quantity': 'Qty', 
+            'th-length': 'L', 
+            'th-width': 'W', 
+            'th-thickness': 'T', 
+            'th-actions': 'Actions', 
+            'clear-parts': 'Clear All', 
+            'settings-title': 'Settings & Plan Generation', 
+            'sheet-length-label': 'Sheet Length (mm)', 
+            'sheet-width-label': 'Sheet Width (mm)', 
+            'rotation-label': 'Allow Rotation', 
+            'generate-plan': 'Generate Cutting Plan', 
+            'plan-title': 'Cutting Plan Summary', 
+            'export-summary': 'Export Summary', 
+            'export-stock': 'Stock Statement', 
+            'export-returns': 'Returns Statement', 
+            'delete': 'Delete', 
+            'no-parts': 'No parts added yet', 
+            'confirm-clear-title': 'Confirm Clear', 
+            'confirm-clear-text': 'Are you sure you want to clear all parts?', 
+            'confirm': 'Confirm', 
+            'cancel': 'Cancel', 
+            'alert-fill-all': 'Please fill all fields with valid numbers.', 
+            'alert-no-parts': 'Please add at least one part to generate a plan.', 
+            'alert-no-plan': 'No cutting plan available to export.', 
+            'excel-loaded': 'Parts loaded successfully from Excel file.', 
+            'excel-error': 'Error reading Excel file. Ensure columns are named correctly (Name, SteelType, Quantity, Length, Width, Thickness).', 
+            'sheet': 'Sheet', 
+            'of': 'of', 
+            'light-mode': 'Light Mode', 
+            'summary-export-title': 'Cutting Summary', 
+            'stock-export-title': 'Stock Statement', 
+            'returns-export-title': 'Returns Statement', 
+            'th-sheet-num': 'Sheet No.', 
+            'th-part-name': 'Part Name', 
+            'th-dimensions': 'Dimensions', 
+            'th-qty-on-sheet': 'Quantity on Sheet',
+            'th-steel-type-stock': 'Steel Type',
+            'th-thickness-stock': 'Thickness',
+            'th-length-stock': 'Length',
+            'th-width-stock': 'Width',
+            'th-quantity-stock': 'Quantity',
+            'th-total-area': 'Total Area (m²)',
+            'th-returns-reason': 'Reason for Return',
+            'no-returns': 'No waste materials available for export',
+            'waste-material': 'Waste Material',
+            'waste-length': 'Waste Length (mm)',
+            'waste-width': 'Waste Width (mm)',
+            'waste-count': 'Count',
+            'no-waste': 'No waste materials with dimensions of 500mm or more',
+            'th-stock-code': 'Stock Code',
+            'th-weight': 'Weight (tons)'
+        },
+        ar: { 
+            'app-title': 'خطة قطع الصاج', 
+            'theme-text': 'الوضع الليلي', 
+            'language-text': 'English', 
+            'input-title': 'إدخال بيانات القطع', 
+            'excel-label': 'تحميل من Excel', 
+            'excel-button': 'اختر ملف Excel', 
+            'manual-label': 'أو أدخل يدويًا', 
+            'part-name': 'اسم القطعة', 
+            'part-steel-type': 'نوع الصلب', 
+            'quantity': 'العدد', 
+            'length': 'الطول', 
+            'width': 'العرض', 
+            'thickness': 'السمك', 
+            'add-part': 'إضافة قطعة', 
+            'parts-title': 'القطع المضافة', 
+            'th-name': 'الاسم', 
+            'th-steel-type': 'نوع الصلب', 
+            'th-quantity': 'عدد', 
+            'th-length': 'طول', 
+            'th-width': 'عرض', 
+            'th-thickness': 'سمك', 
+            'th-actions': 'إجراءات', 
+            'clear-parts': 'مسح الكل', 
+            'settings-title': 'الإعدادات وتوليد الخطة', 
+            'sheet-length-label': 'طول اللوح (مم)', 
+            'sheet-width-label': 'عرض اللوح (مم)', 
+            'rotation-label': 'السماح بالتدوير', 
+            'generate-plan': 'إنشاء خطة القطع', 
+            'plan-title': 'ملخص خطة القطع', 
+            'export-summary': 'تصدير الملخص', 
+            'export-stock': 'بيان الصرف', 
+            'export-returns': 'بيان الارتجاعات', 
+            'delete': 'حذف', 
+            'no-parts': 'لم تتم إضافة أي قطع بعد', 
+            'confirm-clear-title': 'تأكيد المسح', 
+            'confirm-clear-text': 'هل أنت متأكد من رغبتك في مسح جميع القطع؟', 
+            'confirm': 'تأكيد', 
+            'cancel': 'إلغاء', 
+            'alert-fill-all': 'يرجى ملء جميع الحقول بأرقام صحيحة.', 
+            'alert-no-parts': 'يرجى إضافة قطعة واحدة على الأقل لإنشاء الخطة.', 
+            'alert-no-plan': 'لا توجد خطة قطع متاحة للتصدير.', 
+            'excel-loaded': 'تم تحميل القطع بنجاح من ملف Excel.', 
+            'excel-error': 'خطأ في قراءة ملف Excel. تأكد من تسمية الأعمدة بشكل صحيح (Name, SteelType, Quantity, Length, Width, Thickness).', 
+            'sheet': 'لوح', 
+            'of': 'من', 
+            'light-mode': 'الوضع النهاري', 
+            'summary-export-title': 'ملخص القطع', 
+            'stock-export-title': 'بيان الصرف من المخازن', 
+            'returns-export-title': 'بيان الارتجاعات', 
+            'th-sheet-num': 'رقم اللوح', 
+            'th-part-name': 'اسم القطعة', 
+            'th-dimensions': 'الأبعاد', 
+            'th-qty-on-sheet': 'العدد باللوح',
+            'th-steel-type-stock': 'نوع الصلب',
+            'th-thickness-stock': 'السمك (مم)',
+            'th-length-stock': 'الطول (مم)',
+            'th-width-stock': 'العرض (مم)',
+            'th-quantity-stock': 'العدد',
+            'th-total-area': 'المساحة الإجمالية (م²)',
+            'th-returns-reason': 'سبب الإرجاع',
+            'no-returns': 'لا توجد فضلات للتصدير',
+            'waste-material': 'فضلات',
+            'waste-length': 'طول الفضلة (مم)',
+            'waste-width': 'عرض الفضلة (مم)',
+            'waste-count': 'عدد التكرار',
+            'no-waste': 'لا توجد فضلات بأبعاد 500 مم أو أكثر',
+            'th-stock-code': 'كود المخازن',
+            'th-weight': 'الوزن (طن)'
+        }
+    };
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script>
-        // Application data
-        let parts = [];
-        let cuttingPlan = [];
-        let sheetsUsed = 0;
-        let isDarkMode = false;
-        let isEnglish = true;
+    // --- MATERIAL CODES DATABASE ---
+    const materialCodes = {
+        'S235JR': {
+            '8': 'MPP0108',
+            '10': 'MPP0109',
+            '12': 'mpp0085'
+        },
+        'S355JR': {
+            '6': 'MPP0110',
+            '8': 'mpp0111',
+            '10': 'MPP0100',
+            '12': 'MPP0112',
+            '16': 'MPP0113'
+        }
+    };
+
+    // --- WEIGHT CALCULATION FUNCTION ---
+    const calculateWeight = (length, width, thickness, quantity) => {
+        // الوزن = الطول (م) * العرض (م) * السمك (مم) * كثافة الصلب (7.85) / 1000
+        // ثم نضرب في الكمية
+        const weightPerSheet = (length / 1000) * (width / 1000) * thickness * 7.85 / 1000;
+        return (weightPerSheet * quantity).toFixed(3);
+    };
+
+    // --- GET STOCK CODE FUNCTION ---
+    const getStockCode = (steelType, thickness) => {
+        const thicknessKey = thickness.toString();
+        if (materialCodes[steelType] && materialCodes[steelType][thicknessKey]) {
+            return materialCodes[steelType][thicknessKey];
+        }
+        return 'غير معروف';
+    };
+    
+    // --- DOM ELEMENTS ---
+    const dom = {
+        themeToggle: document.getElementById('theme-toggle'),
+        languageToggle: document.getElementById('language-toggle'),
+        addPartBtn: document.getElementById('add-part'),
+        clearPartsBtn: document.getElementById('clear-parts'),
+        generatePlanBtn: document.getElementById('generate-plan'),
+        exportSummaryBtn: document.getElementById('export-summary'),
+        exportStockBtn: document.getElementById('export-stock'),
+        exportReturnsBtn: document.getElementById('export-returns'),
+        excelFileInput: document.getElementById('excel-file'),
+        partsList: document.getElementById('parts-list'),
+        summaryList: document.getElementById('summary-list'),
+        modal: document.getElementById('custom-modal'),
+        modalText: document.getElementById('modal-text'),
+        modalConfirm: document.getElementById('modal-confirm'),
+        modalCancel: document.getElementById('modal-cancel'),
+        totalSheets: document.getElementById('total-sheets'),
+        materialUsage: document.getElementById('material-usage'),
+        wasteArea: document.getElementById('waste-area')
+    };
+    
+    // --- CORE ALGORITHM (BINARY TREE PACKER) ---
+    class Packer {
+        constructor(width, height) {
+            this.root = { x: 0, y: 0, w: width, h: height };
+            this.remainingAreas = [];
+        }
         
-        // Translation dictionary
-        const translations = {
-            en: {
-                // App title and description
-                'app-title': 'Sheet Metal Cutting Planner',
-                'app-description': 'Upload cutting data from Excel or enter manually, then generate the optimal cutting plan',
-                
-                // Instructions
-                'instructions-title': 'Usage Instructions:',
-                'instruction-1': 'You can enter cutting data manually or upload from Excel file',
-                'instruction-2': 'Excel file should contain these columns: "Name", "Quantity", "Length", "Width", "Thickness"',
-                'instruction-3': 'Set the base sheet dimensions before generating the cutting plan',
-                'instruction-4': 'You can export the cutting plan as image or save the data',
-                
-                // Input section
-                'input-title': 'Enter Cutting Data',
-                'excel-label': 'Upload from Excel file:',
-                'excel-button': 'Choose Excel File',
-                'manual-label': 'Or enter data manually:',
-                
-                // Parts list
-                'parts-title': 'Added Parts',
-                'th-name': 'Name',
-                'th-quantity': 'Quantity',
-                'th-length': 'Length',
-                'th-width': 'Width',
-                'th-thickness': 'Thickness',
-                'th-actions': 'Actions',
-                
-                // Sheet settings
-                'settings-title': 'Sheet Settings',
-                'sheet-length-label': 'Sheet Length (mm)',
-                'sheet-width-label': 'Sheet Width (mm)',
-                'margin-label': 'Cutting Margin (mm)',
-                
-                // Output section
-                'plan-title': 'Cutting Plan',
-                'utilization-label': 'Utilization Rate',
-                'sheets-label': 'Sheets Used',
-                'waste-label': 'Waste Area (mm²)',
-                
-                // Buttons
-                'add-part': 'Add Part',
-                'clear-parts': 'Clear All',
-                'generate-plan': 'Generate Cutting Plan',
-                'export-image': 'Export as Image',
-                'export-data': 'Export Data',
-                'delete': 'Delete',
-                
-                // Placeholders
-                'part-name-placeholder': 'Part Name',
-                'quantity-placeholder': 'Quantity',
-                'length-placeholder': 'Length (mm)',
-                'width-placeholder': 'Width (mm)',
-                'thickness-placeholder': 'Thickness (mm)',
-                
-                // Messages
-                'no-parts': 'No parts added',
-                'confirm-clear': 'Are you sure you want to clear all parts?',
-                'alert-fill-all': 'Please fill all fields',
-                'alert-sheet-dimensions': 'Please specify sheet dimensions',
-                'alert-no-parts': 'Please add parts first',
-                'alert-no-plan': 'No cutting plan to export',
-                'excel-loaded': 'Parts loaded from Excel file',
-                'excel-error': 'Error reading Excel file',
-                'excel-no-data': 'No valid data found in Excel file',
-                
-                // Theme and language
-                'dark-mode': 'Dark Mode',
-                'light-mode': 'Light Mode',
-                'switch-arabic': 'العربية',
-                'switch-english': 'English'
-            },
-            ar: {
-                // App title and description
-                'app-title': 'نظام تخطيط قطع الصاج',
-                'app-description': 'قم بتحميل بيانات القطع من ملف Excel أو أدخلها يدويًا، ثم أنشئ خطة القطع المثلى',
-                
-                // Instructions
-                'instructions-title': 'تعليمات الاستخدام:',
-                'instruction-1': 'يمكنك إدخال بيانات القطع يدويًا أو تحميلها من ملف Excel',
-                'instruction-2': 'يجب أن يحتوي ملف Excel على الأعمدة التالية: "الاسم"، "العدد"، "الطول"، "العرض"، "السمك"',
-                'instruction-3': 'حدد أبعاد لوح الصاج الأساسي قبل إنشاء خطة القطع',
-                'instruction-4': 'يمكنك تصدير خطة القطع كصورة أو حفظ البيانات',
-                
-                // Input section
-                'input-title': 'إدخال بيانات القطع',
-                'excel-label': 'تحميل من ملف Excel:',
-                'excel-button': 'اختر ملف Excel',
-                'manual-label': 'أو أدخل البيانات يدويًا:',
-                
-                // Parts list
-                'parts-title': 'القطع المضافة',
-                'th-name': 'الاسم',
-                'th-quantity': 'العدد',
-                'th-length': 'الطول',
-                'th-width': 'العرض',
-                'th-thickness': 'السمك',
-                'th-actions': 'إجراءات',
-                
-                // Sheet settings
-                'settings-title': 'إعدادات اللوح',
-                'sheet-length-label': 'طول اللوح (مم)',
-                'sheet-width-label': 'عرض اللوح (مم)',
-                'margin-label': 'هامش القطع (مم)',
-                
-                // Output section
-                'plan-title': 'خطة القطع',
-                'utilization-label': 'معدل الاستخدام',
-                'sheets-label': 'عدد الألواح المستخدمة',
-                'waste-label': 'المساحة المهدرة (مم²)',
-                
-                // Buttons
-                'add-part': 'إضافة قطعة',
-                'clear-parts': 'مسح الكل',
-                'generate-plan': 'إنشاء خطة القطع',
-                'export-image': 'تصدير كصورة',
-                'export-data': 'تصدير البيانات',
-                'delete': 'حذف',
-                
-                // Placeholders
-                'part-name-placeholder': 'اسم القطعة',
-                'quantity-placeholder': 'العدد',
-                'length-placeholder': 'الطول (مم)',
-                'width-placeholder': 'العرض (مم)',
-                'thickness-placeholder': 'السمك (مم)',
-                
-                // Messages
-                'no-parts': 'لا توجد قطع مضافة',
-                'confirm-clear': 'هل أنت متأكد من مسح جميع القطع؟',
-                'alert-fill-all': 'يرجى ملء جميع الحقول',
-                'alert-sheet-dimensions': 'يرجى تحديد أبعاد اللوح',
-                'alert-no-parts': 'يرجى إضافة قطع أولاً',
-                'alert-no-plan': 'لا توجد خطة قطع لتصديرها',
-                'excel-loaded': 'تم تحميل القطع من ملف Excel',
-                'excel-error': 'خطأ في قراءة ملف Excel',
-                'excel-no-data': 'لم يتم العثور على بيانات صالحة في ملف Excel',
-                
-                // Theme and language
-                'dark-mode': 'الوضع الليلي',
-                'light-mode': 'الوضع النهاري',
-                'switch-arabic': 'العربية',
-                'switch-english': 'English'
+        fit(blocks) {
+            let node;
+            for (const block of blocks) {
+                if (node = this.findNode(this.root, block.w, block.h)) {
+                    block.fit = this.splitNode(node, block.w, block.h);
+                }
             }
-        };
-        
-        // DOM elements
-        const partsList = document.getElementById('parts-list');
-        const addPartBtn = document.getElementById('add-part');
-        const clearPartsBtn = document.getElementById('clear-parts');
-        const generatePlanBtn = document.getElementById('generate-plan');
-        const exportImageBtn = document.getElementById('export-image');
-        const exportDataBtn = document.getElementById('export-data');
-        const excelFileInput = document.getElementById('excel-file');
-        const canvas = document.getElementById('cutting-canvas');
-        const ctx = canvas.getContext('2d');
-        const themeToggle = document.getElementById('theme-toggle');
-        const languageToggle = document.getElementById('language-toggle');
-        const themeIcon = document.getElementById('theme-icon');
-        const themeText = document.getElementById('theme-text');
-        const languageText = document.getElementById('language-text');
-        
-        // Initialize the app
-        function initApp() {
-            // Add event listeners
-            addPartBtn.addEventListener('click', addPart);
-            clearPartsBtn.addEventListener('click', clearParts);
-            generatePlanBtn.addEventListener('click', generateCuttingPlan);
-            exportImageBtn.addEventListener('click', exportAsImage);
-            exportDataBtn.addEventListener('click', exportData);
-            excelFileInput.addEventListener('change', handleExcelFile);
-            themeToggle.addEventListener('click', toggleTheme);
-            languageToggle.addEventListener('click', toggleLanguage);
             
-            // Update parts list display
-            updatePartsList();
-            
-            // Initialize canvas
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
-            // Set initial language and theme
-            updateLanguage();
-            updateTheme();
+            // حساب المساحات المتبقية بعد التقطيع
+            this.calculateRemainingAreas(this.root);
         }
         
-        // Toggle between light and dark mode
-        function toggleTheme() {
-            isDarkMode = !isDarkMode;
-            updateTheme();
+        findNode(root, w, h) {
+            if (root.used) {
+                return this.findNode(root.right, w, h) || this.findNode(root.down, w, h);
+            } else if ((w <= root.w) && (h <= root.h)) {
+                return root;
+            }
+            return null;
         }
         
-        // Update theme based on current state
-        function updateTheme() {
-            if (isDarkMode) {
-                document.body.classList.add('dark-mode');
-                themeIcon.textContent = '☀️';
-                themeText.textContent = isEnglish ? translations.en['light-mode'] : translations.ar['light-mode'];
+        splitNode(node, w, h) {
+            node.used = true;
+            node.down = { x: node.x, y: node.y + h, w: node.w, h: node.h - h };
+            node.right = { x: node.x + w, y: node.y, w: node.w - w, h: h };
+            return node;
+        }
+        
+        calculateRemainingAreas(node) {
+            if (!node) return;
+            
+            if (!node.used) {
+                // هذه منطقة غير مستخدمة (فضلات)
+                this.remainingAreas.push({
+                    x: node.x,
+                    y: node.y,
+                    w: node.w,
+                    h: node.h
+                });
             } else {
-                document.body.classList.remove('dark-mode');
-                themeIcon.textContent = '🌙';
-                themeText.textContent = isEnglish ? translations.en['dark-mode'] : translations.ar['dark-mode'];
+                this.calculateRemainingAreas(node.right);
+                this.calculateRemainingAreas(node.down);
             }
         }
         
-        // Toggle between English and Arabic
-        function toggleLanguage() {
-            isEnglish = !isEnglish;
-            updateLanguage();
+        getRemainingAreas() {
+            return this.remainingAreas;
         }
-        
-        // Update language based on current state
-        function updateLanguage() {
+    }
+    
+    // --- UI & LOGIC FUNCTIONS ---
+    const showAlert = (textKey) => {
+        const lang = isEnglish ? 'en' : 'ar';
+        dom.modalText.textContent = translations[lang][textKey];
+        dom.modalConfirm.style.display = 'none';
+        dom.modalCancel.textContent = 'Ok';
+        dom.modal.classList.add('visible');
+        return new Promise(resolve => {
+            dom.modalCancel.onclick = () => {
+                dom.modal.classList.remove('visible');
+                resolve();
+            };
+        });
+    };
+    
+    const showConfirm = (textKey) => {
+        const lang = isEnglish ? 'en' : 'ar';
+        dom.modalText.textContent = translations[lang][textKey];
+        dom.modalConfirm.style.display = 'inline-block';
+        dom.modalConfirm.textContent = translations[lang]['confirm'];
+        dom.modalCancel.textContent = translations[lang]['cancel'];
+        dom.modal.classList.add('visible');
+        return new Promise(resolve => {
+            dom.modalConfirm.onclick = () => {
+                dom.modal.classList.remove('visible');
+                resolve(true);
+            };
+            dom.modalCancel.onclick = () => {
+                dom.modal.classList.remove('visible');
+                resolve(false);
+            };
+        });
+    };
+    
+    const updatePartsList = () => {
+        dom.partsList.innerHTML = '';
+        if (parts.length === 0) {
             const lang = isEnglish ? 'en' : 'ar';
-            const dir = isEnglish ? 'ltr' : 'rtl';
-            
-            // Update document direction
-            document.body.setAttribute('dir', dir);
-            document.documentElement.setAttribute('lang', lang);
-            
-            // Update language toggle text
-            languageText.textContent = isEnglish ? translations.en['switch-arabic'] : translations.ar['switch-english'];
-            
-            // Update all translatable elements
-            for (const [key, value] of Object.entries(translations[lang])) {
-                const element = document.getElementById(key);
-                if (element) {
-                    if (element.tagName === 'INPUT' && key.includes('placeholder')) {
-                        element.placeholder = value;
-                    } else {
-                        element.textContent = value;
-                    }
-                }
-            }
-            
-            // Update parts list
-            updatePartsList();
+            dom.partsList.innerHTML = `<tr><td colspan="7" style="text-align: center;">${translations[lang]['no-parts']}</td></tr>`;
+            return;
+        }
+        parts.forEach((part, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${part.name}</td>
+                <td>${part.steelType}</td>
+                <td>${part.quantity}</td>
+                <td>${part.length}</td>
+                <td>${part.width}</td>
+                <td>${part.thickness}</td>
+                <td class="actions-cell">
+                    <button class="btn-danger" data-index="${index}">${isEnglish ? 'Delete' : 'حذف'}</button>
+                </td>`;
+            row.querySelector('button').addEventListener('click', () => removePart(index));
+            dom.partsList.appendChild(row);
+        });
+    };
+    
+    const addPart = () => {
+        const name = document.getElementById('part-name').value.trim();
+        const steelType = document.getElementById('part-steel-type').value.trim();
+        const quantity = parseInt(document.getElementById('part-quantity').value);
+        const length = parseFloat(document.getElementById('part-length').value);
+        const width = parseFloat(document.getElementById('part-width').value);
+        const thickness = parseFloat(document.getElementById('part-thickness').value);
+        
+        if (!name || !steelType || isNaN(quantity) || isNaN(length) || isNaN(width) || isNaN(thickness) || quantity <= 0 || length <= 0 || width <= 0 || thickness <= 0) {
+            showAlert('alert-fill-all');
+            return;
         }
         
-        // Add a new part
-        function addPart() {
-            const name = document.getElementById('part-name').value.trim();
-            const quantity = parseInt(document.getElementById('part-quantity').value);
-            const length = parseInt(document.getElementById('part-length').value);
-            const width = parseInt(document.getElementById('part-width').value);
-            const thickness = parseFloat(document.getElementById('part-thickness').value);
-            
-            if (!name || !quantity || !length || !width || !thickness) {
-                alert(isEnglish ? translations.en['alert-fill-all'] : translations.ar['alert-fill-all']);
-                return;
-            }
-            
-            parts.push({
-                id: Date.now(),
-                name,
-                quantity,
-                length,
-                width,
-                thickness
-            });
-            
-            // Clear fields
-            document.getElementById('part-name').value = '';
-            document.getElementById('part-quantity').value = '1';
-            document.getElementById('part-length').value = '';
-            document.getElementById('part-width').value = '';
-            document.getElementById('part-thickness').value = '';
-            
-            updatePartsList();
-        }
+        parts.push({ name, steelType, quantity, length, width, thickness });
+        updatePartsList();
         
-        // Update parts list display
-        function updatePartsList() {
-            partsList.innerHTML = '';
-            
-            if (parts.length === 0) {
-                partsList.innerHTML = `<tr><td colspan="6" style="text-align: center;">${isEnglish ? translations.en['no-parts'] : translations.ar['no-parts']}</td></tr>`;
-                return;
-            }
-            
-            parts.forEach(part => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${part.name}</td>
-                    <td>${part.quantity}</td>
-                    <td>${part.length} mm</td>
-                    <td>${part.width} mm</td>
-                    <td>${part.thickness} mm</td>
-                    <td>
-                        <button onclick="removePart(${part.id})" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">${isEnglish ? translations.en['delete'] : translations.ar['delete']}</button>
-                    </td>
-                `;
-                partsList.appendChild(row);
-            });
-        }
-        
-        // Remove a part
-        function removePart(id) {
-            parts = parts.filter(part => part.id !== id);
-            updatePartsList();
-        }
-        
-        // Clear all parts
-        function clearParts() {
-            if (confirm(isEnglish ? translations.en['confirm-clear'] : translations.ar['confirm-clear'])) {
-                parts = [];
-                updatePartsList();
-            }
-        }
-        
-        // Handle Excel file upload - CORRECTED VERSION
-        function handleExcelFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    // Assume the first sheet contains the data
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                    
-                    if (jsonData.length === 0) {
-                        alert(isEnglish ? translations.en['excel-no-data'] : translations.ar['excel-no-data']);
-                        return;
-                    }
-                    
-                    // Convert data to app format
-                    const newParts = [];
-                    jsonData.forEach((row, index) => {
-                        // Normalize column names to handle different naming conventions
-                        const normalizedRow = {};
-                        Object.keys(row).forEach(key => {
-                            const normalizedKey = key.toLowerCase().trim();
-                            normalizedRow[normalizedKey] = row[key];
-                        });
-                        
-                        // Try to extract data with flexible column names
-                        const name = normalizedRow.name || normalizedRow['الاسم'] || normalizedRow.part || `Part ${index + 1}`;
-                        const quantity = normalizedRow.quantity || normalizedRow['العدد'] || normalizedRow.qty || 1;
-                        const length = normalizedRow.length || normalizedRow['الطول'] || normalizedRow.l || 0;
-                        const width = normalizedRow.width || normalizedRow['العرض'] || normalizedRow.w || 0;
-                        const thickness = normalizedRow.thickness || normalizedRow['السمك'] || normalizedRow.t || 1;
-                        
-                        // Validate required data
-                        if (length > 0 && width > 0) {
-                            newParts.push({
-                                id: Date.now() + index,
-                                name: name.toString(),
-                                quantity: parseInt(quantity) || 1,
-                                length: parseInt(length),
-                                width: parseInt(width),
-                                thickness: parseFloat(thickness) || 1
-                            });
-                        }
-                    });
-                    
-                    if (newParts.length === 0) {
-                        alert(isEnglish ? translations.en['excel-no-data'] : translations.ar['excel-no-data']);
-                        return;
-                    }
-                    
-                    // Add new parts to the existing list
-                    parts = [...parts, ...newParts];
-                    updatePartsList();
-                    alert(isEnglish ? translations.en['excel-loaded'] : translations.ar['excel-loaded']);
-                    
-                    // Reset file input to allow uploading the same file again if needed
-                    event.target.value = '';
-                } catch (error) {
-                    console.error('Error processing Excel file:', error);
-                    alert(isEnglish ? translations.en['excel-error'] : translations.ar['excel-error']);
-                }
-            };
-            
-            reader.onerror = function() {
-                alert(isEnglish ? translations.en['excel-error'] : translations.ar['excel-error']);
-            };
-            
-            reader.readAsArrayBuffer(file);
-        }
-        
-        // Resize canvas
-        function resizeCanvas() {
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            
-            // Redraw cutting plan if exists
-            if (cuttingPlan.length > 0) {
-                drawCuttingPlan();
-            }
-        }
-        
-        // Generate cutting plan
-        function generateCuttingPlan() {
-            if (parts.length === 0) {
-                alert(isEnglish ? translations.en['alert-no-parts'] : translations.ar['alert-no-parts']);
-                return;
-            }
-            
-            const sheetLength = parseInt(document.getElementById('sheet-length').value);
-            const sheetWidth = parseInt(document.getElementById('sheet-width').value);
-            const cutMargin = parseInt(document.getElementById('cut-margin').value);
-            
-            if (!sheetLength || !sheetWidth) {
-                alert(isEnglish ? translations.en['alert-sheet-dimensions'] : translations.ar['alert-sheet-dimensions']);
-                return;
-            }
-            
-            // Initialize cutting plan
+        // Clear inputs
+        document.getElementById('part-name').value = '';
+        document.getElementById('part-steel-type').value = '';
+        document.getElementById('part-quantity').value = '1';
+        document.getElementById('part-length').value = '';
+        document.getElementById('part-width').value = '';
+        document.getElementById('part-thickness').value = '';
+        document.getElementById('part-name').focus();
+    };
+    
+    const removePart = (index) => {
+        parts.splice(index, 1);
+        updatePartsList();
+    };
+    
+    const clearParts = async () => {
+        if(parts.length === 0) return;
+        const confirmed = await showConfirm('confirm-clear-text');
+        if (confirmed) {
+            parts = [];
             cuttingPlan = [];
-            sheetsUsed = 0;
-            
-            // Copy parts and expand by quantity
-            let allPieces = [];
-            parts.forEach(part => {
-                for (let i = 0; i < part.quantity; i++) {
-                    allPieces.push({
-                        id: part.id,
-                        name: part.name,
-                        length: part.length,
-                        width: part.width,
-                        thickness: part.thickness
-                    });
-                }
-            });
-            
-            // Sort pieces from largest to smallest (by area)
-            allPieces.sort((a, b) => (b.length * b.width) - (a.length * a.width));
-            
-            // Simple algorithm for placing pieces (can be improved for efficiency)
-            let currentSheet = {
-                pieces: [],
-                remainingAreas: [{x: 0, y: 0, width: sheetWidth, height: sheetLength}]
-            };
-            
-            sheetsUsed = 1;
-            cuttingPlan.push(currentSheet);
-            
-            allPieces.forEach(piece => {
-                let placed = false;
-                
-                // Try to place the piece in existing sheets
-                for (let i = 0; i < cuttingPlan.length && !placed; i++) {
-                    const sheet = cuttingPlan[i];
-                    
-                    // Find suitable area in the sheet
-                    for (let j = 0; j < sheet.remainingAreas.length && !placed; j++) {
-                        const area = sheet.remainingAreas[j];
-                        
-                        // Check if piece fits in the area (with or without rotation)
-                        if ((piece.width + cutMargin <= area.width && piece.length + cutMargin <= area.height) ||
-                            (piece.length + cutMargin <= area.width && piece.width + cutMargin <= area.height)) {
-                            
-                            // Determine optimal orientation
-                            let rotated = false;
-                            if (piece.width + cutMargin <= area.width && piece.length + cutMargin <= area.height) {
-                                // Normal orientation
-                            } else if (piece.length + cutMargin <= area.width && piece.width + cutMargin <= area.height) {
-                                // Rotate the piece
-                                rotated = true;
-                            }
-                            
-                            const pieceWidth = rotated ? piece.length : piece.width;
-                            const pieceLength = rotated ? piece.width : piece.length;
-                            
-                            // Place the piece
-                            sheet.pieces.push({
-                                ...piece,
-                                x: area.x,
-                                y: area.y,
-                                rotated,
-                                sheetIndex: i
-                            });
-                            
-                            // Update remaining areas (simplified algorithm)
-                            sheet.remainingAreas.splice(j, 1);
-                            
-                            // Add new areas
-                            if (area.width - (pieceWidth + cutMargin) > 0) {
-                                sheet.remainingAreas.push({
-                                    x: area.x + pieceWidth + cutMargin,
-                                    y: area.y,
-                                    width: area.width - (pieceWidth + cutMargin),
-                                    height: area.height
-                                });
-                            }
-                            
-                            if (area.height - (pieceLength + cutMargin) > 0) {
-                                sheet.remainingAreas.push({
-                                    x: area.x,
-                                    y: area.y + pieceLength + cutMargin,
-                                    width: pieceWidth,
-                                    height: area.height - (pieceLength + cutMargin)
-                                });
-                            }
-                            
-                            placed = true;
-                            break;
-                        }
-                    }
-                }
-                
-                // If piece couldn't be placed in any existing sheet, create a new one
-                if (!placed) {
-                    const newSheet = {
-                        pieces: [],
-                        remainingAreas: [{x: 0, y: 0, width: sheetWidth, height: sheetLength}]
-                    };
-                    
-                    // Place piece in the new sheet
-                    newSheet.pieces.push({
-                        ...piece,
-                        x: 0,
-                        y: 0,
-                        rotated: false,
-                        sheetIndex: cuttingPlan.length
-                    });
-                    
-                    // Update remaining areas
-                    newSheet.remainingAreas = [
-                        {x: piece.width + cutMargin, y: 0, width: sheetWidth - (piece.width + cutMargin), height: sheetLength},
-                        {x: 0, y: piece.length + cutMargin, width: piece.width, height: sheetLength - (piece.length + cutMargin)}
-                    ];
-                    
-                    cuttingPlan.push(newSheet);
-                    sheetsUsed++;
-                }
-            });
-            
-            // Draw cutting plan
-            drawCuttingPlan();
-            
-            // Update statistics
-            updateStatistics();
+            stockStatement = [];
+            returnsStatement = [];
+            updatePartsList();
+            updateSummaryTable();
+            updateStats();
+        }
+    };
+    
+    const generateCuttingPlan = () => {
+        if (parts.length === 0) {
+            showAlert('alert-no-parts');
+            return;
         }
         
-        // Draw cutting plan
-        function drawCuttingPlan() {
-            const sheetLength = parseInt(document.getElementById('sheet-length').value);
-            const sheetWidth = parseInt(document.getElementById('sheet-width').value);
-            const scale = Math.min(
-                canvas.width / (sheetWidth + 40),
-                canvas.height / (sheetLength + 40)
-            );
+        const sheetLength = parseFloat(document.getElementById('sheet-length').value);
+        const sheetWidth = parseFloat(document.getElementById('sheet-width').value);
+        const margin = 0; // إلغاء هامش القطع
+        const allowRotation = document.getElementById('allow-rotation').checked;
+        
+        const allIndividualParts = [];
+        parts.forEach(part => {
+            for (let i = 0; i < part.quantity; i++) {
+                allIndividualParts.push({ ...part,
+                    w: part.length + margin,
+                    h: part.width + margin,
+                    original_w: part.length,
+                    original_h: part.width,
+                    area: (part.length + margin) * (part.width + margin)
+                });
+            }
+        });
+        
+        // Group by thickness AND steel type
+        const partsByGroup = allIndividualParts.reduce((groups, item) => {
+            const key = `${item.thickness}-${item.steelType}`;
+            const group = (groups[key] || []);
+            group.push(item);
+            groups[key] = group;
+            return groups;
+        }, {});
+        
+        cuttingPlan = [];
+        returnsStatement = [];
+        
+        for (const groupKey in partsByGroup) {
+            let partsToPack = partsByGroup[groupKey];
+            partsToPack.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.area - a.area);
+            const [thickness, steelType] = groupKey.split('-');
+            let sheetIndex = 1;
             
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw sheets and pieces
-            const colors = [
-                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', 
-                '#9b59b6', '#1abc9c', '#d35400', '#c0392b'
-            ];
-            
-            // Create color legend
-            const colorLegend = document.getElementById('color-legend');
-            colorLegend.innerHTML = '';
-            
-            const partTypes = [...new Set(parts.map(p => p.name))];
-            partTypes.forEach((type, index) => {
-                const legendItem = document.createElement('div');
-                legendItem.className = 'legend-item';
-                legendItem.innerHTML = `
-                    <div class="legend-color" style="background-color: ${colors[index % colors.length]}"></div>
-                    <span>${type}</span>
-                `;
-                colorLegend.appendChild(legendItem);
-            });
-            
-            // Draw each sheet
-            cuttingPlan.forEach((sheet, sheetIndex) => {
-                const xOffset = (canvas.width - (sheetWidth * scale)) / 2;
-                const yOffset = 20 + (sheetIndex * (sheetLength * scale + 40));
+            while(partsToPack.length > 0) {
+                const packer = new Packer(sheetLength, sheetWidth);
+                const remainingParts = [];
                 
-                // Draw sheet border
-                ctx.strokeStyle = '#34495e';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(xOffset, yOffset, sheetWidth * scale, sheetLength * scale);
+                if (allowRotation) {
+                    partsToPack.forEach(part => {
+                        const node = packer.findNode(packer.root, part.w, part.h);
+                        const rotatedNode = packer.findNode(packer.root, part.h, part.w);
+                        if(node && rotatedNode) {
+                            part.rotated = (rotatedNode.h - part.w) < (node.h - part.h);
+                        } else if(rotatedNode) {
+                            part.rotated = true;
+                        } else {
+                            part.rotated = false;
+                        }
+                        if (part.rotated) {
+                            [part.w, part.h] = [part.h, part.w];
+                        }
+                    });
+                }
                 
-                // Write sheet number
-                ctx.fillStyle = '#34495e';
-                ctx.font = '14px Arial';
-                ctx.fillText(`Sheet ${sheetIndex + 1}`, xOffset, yOffset - 5);
-                
-                // Draw pieces in the sheet
-                sheet.pieces.forEach(piece => {
-                    const colorIndex = partTypes.indexOf(piece.name);
-                    const color = colors[colorIndex % colors.length];
-                    
-                    const x = xOffset + piece.x * scale;
-                    const y = yOffset + piece.y * scale;
-                    const width = (piece.rotated ? piece.length : piece.width) * scale;
-                    const height = (piece.rotated ? piece.width : piece.length) * scale;
-                    
-                    // Draw the piece
-                    ctx.fillStyle = color + '80'; // Transparency
-                    ctx.fillRect(x, y, width, height);
-                    
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(x, y, width, height);
-                    
-                    // Write piece name and dimensions
-                    ctx.fillStyle = '#2c3e50';
-                    ctx.font = '10px Arial';
-                    ctx.textAlign = 'center';
-                    
-                    const textX = x + width / 2;
-                    const textY = y + height / 2;
-                    
-                    ctx.fillText(piece.name, textX, textY - 10);
-                    ctx.fillText(
-                        `${piece.rotated ? piece.length : piece.width} × ${piece.rotated ? piece.width : piece.length}`,
-                        textX, textY + 5
-                    );
-                    
-                    // Draw rotation symbol if piece is rotated
-                    if (piece.rotated) {
-                        ctx.fillStyle = '#e74c3c';
-                        ctx.font = '8px Arial';
-                        ctx.fillText('↻', x + 10, y + 10);
+                packer.fit(partsToPack);
+                const packedOnThisSheet = [];
+                partsToPack.forEach(p => {
+                    if (p.fit) {
+                        packedOnThisSheet.push(p);
+                    } else {
+                        if (p.rotated) [p.w, p.h] = [p.h, p.w];
+                        remainingParts.push(p);
                     }
                 });
-            });
+                
+                if (packedOnThisSheet.length > 0) {
+                    // حساب فضلات الخامات لهذا اللوح
+                    const remainingAreas = packer.getRemainingAreas();
+                    const sheetReturns = [];
+                    
+                    remainingAreas.forEach(area => {
+                        // إضافة الفضلات إذا كان طولها وعرضها 500 مم أو أكثر
+                        if (area.w >= 500 && area.h >= 500) {
+                            sheetReturns.push({
+                                length: area.w,
+                                width: area.h,
+                                steelType: steelType,
+                                thickness: parseFloat(thickness),
+                                sheetNumber: sheetIndex
+                            });
+                        }
+                    });
+                    
+                    cuttingPlan.push({
+                        sheetNumber: sheetIndex++,
+                        thickness: parseFloat(thickness),
+                        steelType: steelType,
+                        parts: packedOnThisSheet,
+                        sheetLength,
+                        sheetWidth,
+                        returns: sheetReturns
+                    });
+                    
+                    // إضافة الفضلات إلى بيان الارتجاعات العام
+                    returnsStatement = returnsStatement.concat(sheetReturns);
+                } else if (remainingParts.length > 0) {
+                    // إذا كانت هناك قطع لم يتم وضعها، نتجاهلها (لأنها ستكون كبيرة جداً)
+                    remainingParts.shift(); 
+                }
+                
+                partsToPack = remainingParts;
+                partsToPack.forEach(p => delete p.fit);
+            }
         }
         
-        // Update statistics
-        function updateStatistics() {
-            const sheetLength = parseInt(document.getElementById('sheet-length').value);
-            const sheetWidth = parseInt(document.getElementById('sheet-width').value);
-            const totalSheetArea = sheetLength * sheetWidth * sheetsUsed;
+        // إنشاء بيان الصرف من المخازن
+        generateStockStatement();
+        updateSummaryTable();
+        updateStats();
+        
+        // عرض رسالة إذا كان هناك ارتجاعات
+        if (returnsStatement.length > 0) {
+            const lang = isEnglish ? 'en' : 'ar';
+            const message = isEnglish ? 
+                `There are waste pieces that can be reused. Check the returns statement.` :
+                `هناك فضلات يمكن إعادة استخدامها. راجع بيان الارتجاعات.`;
+            showAlert(message);
+        }
+    };
+    
+    const generateStockStatement = () => {
+        stockStatement = [];
+        
+        // تجميع البيانات حسب نوع الصلب والسمك
+        const stockByType = {};
+        
+        cuttingPlan.forEach(sheet => {
+            const key = `${sheet.steelType}-${sheet.thickness}`;
+            if (!stockByType[key]) {
+                stockByType[key] = {
+                    steelType: sheet.steelType,
+                    thickness: sheet.thickness,
+                    sheets: 0,
+                    totalArea: 0,
+                    totalWeight: 0
+                };
+            }
+            stockByType[key].sheets++;
+            const sheetArea = (sheet.sheetLength * sheet.sheetWidth) / 1000000; // تحويل إلى متر مربع
+            stockByType[key].totalArea += sheetArea;
+            // حساب الوزن الإجمالي
+            stockByType[key].totalWeight += parseFloat(calculateWeight(
+                sheet.sheetLength, 
+                sheet.sheetWidth, 
+                sheet.thickness, 
+                1
+            ));
+        });
+        
+        // تحويل الكائن إلى مصفوفة
+        for (const key in stockByType) {
+            stockStatement.push(stockByType[key]);
+        }
+    };
+    
+    const updateStats = () => {
+        const totalSheets = cuttingPlan.length;
+        dom.totalSheets.textContent = totalSheets;
+        
+        if (totalSheets > 0) {
+            const sheetArea = (cuttingPlan[0].sheetLength * cuttingPlan[0].sheetWidth) / 1000000; // متر مربع
+            const totalSheetArea = totalSheets * sheetArea;
             
             let usedArea = 0;
-            parts.forEach(part => {
-                usedArea += (part.length * part.width) * part.quantity;
+            cuttingPlan.forEach(sheet => {
+                sheet.parts.forEach(part => {
+                    usedArea += (part.length * part.width) / 1000000; // متر مربع
+                });
             });
             
-            const utilizationRate = Math.round((usedArea / totalSheetArea) * 100);
+            const usagePercentage = Math.round((usedArea / totalSheetArea) * 100);
             const wasteArea = totalSheetArea - usedArea;
             
-            document.getElementById('utilization-rate').textContent = `${utilizationRate}%`;
-            document.getElementById('sheets-used').textContent = sheetsUsed;
-            document.getElementById('waste-area').textContent = wasteArea.toLocaleString();
+            dom.materialUsage.textContent = `${usagePercentage}%`;
+            dom.wasteArea.textContent = wasteArea.toFixed(2);
+        } else {
+            dom.materialUsage.textContent = '0%';
+            dom.wasteArea.textContent = '0';
+        }
+    };
+    
+    const updateSummaryTable = () => {
+        const summaryList = document.getElementById('summary-list');
+        summaryList.innerHTML = '';
+        
+        if (cuttingPlan.length === 0) {
+            const lang = isEnglish ? 'en' : 'ar';
+            summaryList.innerHTML = `<tr><td colspan="6" style="text-align: center;">${translations[lang]['no-parts']}</td></tr>`;
+            return;
         }
         
-        // Export as image
-        function exportAsImage() {
-            if (cuttingPlan.length === 0) {
-                alert(isEnglish ? translations.en['alert-no-plan'] : translations.ar['alert-no-plan']);
-                return;
-            }
-            
-            const link = document.createElement('a');
-            link.download = isEnglish ? 'cutting_plan.png' : 'خطة_القطع.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }
+        // تجميع الألواح المماثلة
+        const sheetGroups = new Map();
         
-        // Export data
-        function exportData() {
-            if (cuttingPlan.length === 0) {
-                alert(isEnglish ? translations.en['alert-no-plan'] : translations.ar['alert-no-plan']);
-                return;
-            }
+        cuttingPlan.forEach(sheet => {
+            // إنشاء مفتاح فريد للوح
+            const partsKey = sheet.parts.map(part => 
+                `${part.name}|${part.original_w}x${part.original_h}`).sort().join('|');
+            const sheetKey = `${sheet.steelType}|${sheet.thickness}|${partsKey}`;
             
-            // Create Excel data
-            const data = [];
-            
-            // Add general information
-            data.push([isEnglish ? 'Sheet Metal Cutting Plan' : 'خطة قطع الصاج']);
-            data.push([isEnglish ? 'Creation Date' : 'تاريخ الإنشاء', new Date().toLocaleDateString(isEnglish ? 'en-US' : 'ar-EG')]);
-            data.push([isEnglish ? 'Sheets Used' : 'عدد الألواح المستخدمة', sheetsUsed]);
-            data.push([]);
-            
-            // Add parts details
-            data.push([isEnglish ? 'Parts Details:' : 'تفاصيل القطع:']);
-            data.push([
-                isEnglish ? 'Name' : 'الاسم',
-                isEnglish ? 'Quantity' : 'العدد',
-                isEnglish ? 'Length (mm)' : 'الطول (مم)',
-                isEnglish ? 'Width (mm)' : 'العرض (مم)',
-                isEnglish ? 'Thickness (mm)' : 'السمك (مم)'
-            ]);
-            parts.forEach(part => {
-                data.push([part.name, part.quantity, part.length, part.width, part.thickness]);
-            });
-            
-            data.push([]);
-            
-            // Add cutting plan for each sheet
-            cuttingPlan.forEach((sheet, index) => {
-                data.push([isEnglish ? `Sheet ${index + 1}:` : `اللوح ${index + 1}:`]);
-                data.push([
-                    isEnglish ? 'Name' : 'الاسم',
-                    isEnglish ? 'Position X' : 'الموضع X',
-                    isEnglish ? 'Position Y' : 'الموضع Y',
-                    isEnglish ? 'Rotated' : 'متدورة'
-                ]);
-                
-                sheet.pieces.forEach(piece => {
-                    data.push([
-                        piece.name,
-                        piece.x,
-                        piece.y,
-                        piece.rotated ? (isEnglish ? 'Yes' : 'نعم') : (isEnglish ? 'No' : 'لا')
-                    ]);
+            if (!sheetGroups.has(sheetKey)) {
+                sheetGroups.set(sheetKey, {
+                    count: 0,
+                    steelType: sheet.steelType,
+                    thickness: sheet.thickness,
+                    parts: new Map()
                 });
+            }
+            
+            const group = sheetGroups.get(sheetKey);
+            group.count++;
+            
+            // تجميع القطع في المجموعة
+            sheet.parts.forEach(part => {
+                const partKey = `${part.name}|${part.original_w}x${part.original_h}`;
+                group.parts.set(partKey, (group.parts.get(partKey) || 0) + 1);
+            });
+        });
+        
+        // إنشاء الصفوف للجدول
+        let sheetNumber = 1;
+        sheetGroups.forEach((group, key) => {
+            const partsArray = Array.from(group.parts.entries());
+            
+            partsArray.forEach(([partKey, totalQuantity], index) => {
+                const [name, dimensions] = partKey.split('|');
+                const row = document.createElement('tr');
                 
-                data.push([]);
+                row.innerHTML = `
+                    <td>${sheetNumber}</td>
+                    <td>${group.steelType}</td>
+                    <td>${group.thickness} mm</td>
+                    <td>${name}</td>
+                    <td>${dimensions}</td>
+                    <td>${totalQuantity}${group.count > 1 ? ` (${group.count} ${isEnglish ? 'sheets' : 'لوحات'})` : ''}</td>
+                `;
+                
+                summaryList.appendChild(row);
             });
             
-            // Create workbook
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, isEnglish ? 'Cutting Plan' : 'خطة القطع');
-            
-            // Export file
-            XLSX.writeFile(wb, isEnglish ? 'cutting_plan.xlsx' : 'خطة_القطع.xlsx');
+            sheetNumber++;
+        });
+    };
+    
+    const handleExcelFile = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: true });
+                const requiredHeaders = ["name", "steeltype", "quantity", "length", "width", "thickness"];
+                const headerMap = {};
+                const excelHeaders = Object.keys(jsonData[0] || {});
+                requiredHeaders.forEach(reqHeader => {
+                    const foundHeader = excelHeaders.find(exHeader => exHeader.toLowerCase().trim() === reqHeader);
+                    if(foundHeader) headerMap[reqHeader] = foundHeader;
+                });
+                if (requiredHeaders.some(h => !headerMap[h])) {
+                    throw new Error("Missing required columns");
+                }
+                const newParts = jsonData.map(row => ({
+                    name: String(row[headerMap.name]),
+                    steelType: String(row[headerMap.steeltype]),
+                    quantity: parseInt(row[headerMap.quantity]),
+                    length: parseFloat(row[headerMap.length]),
+                    width: parseFloat(row[headerMap.width]),
+                    thickness: parseFloat(row[headerMap.thickness])
+                })).filter(p => p.name && p.steelType && !isNaN(p.quantity) && !isNaN(p.length) && !isNaN(p.width) && !isNaN(p.thickness));
+                if(newParts.length > 0) {
+                    parts = parts.concat(newParts);
+                    updatePartsList();
+                    showAlert('excel-loaded');
+                }
+            } catch (error) {
+                console.error(error);
+                showAlert('excel-error');
+            } finally {
+                event.target.value = '';
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+    
+    // --- دوال التصدير المحسنة ---
+    const exportSummary = () => {
+        if (cuttingPlan.length === 0) {
+            showAlert('alert-no-plan');
+            return;
         }
         
-        // Start the application
-        window.onload = initApp;
-    </script>
+        const lang = isEnglish ? 'en' : 'ar';
+        const translationsForExport = translations[lang];
+        
+        // تجميع الألواح المماثلة
+        const sheetGroups = new Map();
+        
+        cuttingPlan.forEach(sheet => {
+            const partsKey = sheet.parts.map(part => 
+                `${part.name}|${part.original_w}x${part.original_h}`).sort().join('|');
+            const sheetKey = `${sheet.steelType}|${sheet.thickness}|${partsKey}`;
+            
+            if (!sheetGroups.has(sheetKey)) {
+                sheetGroups.set(sheetKey, {
+                    count: 0,
+                    steelType: sheet.steelType,
+                    thickness: sheet.thickness,
+                    parts: new Map()
+                });
+            }
+            
+            const group = sheetGroups.get(sheetKey);
+            group.count++;
+            
+            sheet.parts.forEach(part => {
+                const partKey = `${part.name}|${part.original_w}x${part.original_h}`;
+                group.parts.set(partKey, (group.parts.get(partKey) || 0) + 1);
+            });
+        });
+        
+        // إنشاء البيانات للتصدير
+        const exportData = [];
+        let sheetNumber = 1;
+        
+        sheetGroups.forEach((group, key) => {
+            const partsArray = Array.from(group.parts.entries());
+            
+            partsArray.forEach(([partKey, totalQuantity]) => {
+                const [name, dimensions] = partKey.split('|');
+                
+                exportData.push({
+                    [translationsForExport['th-sheet-num']]: sheetNumber,
+                    [translationsForExport['th-steel-type']]: group.steelType,
+                    [translationsForExport['th-thickness']]: `${group.thickness} mm`,
+                    [translationsForExport['th-part-name']]: name,
+                    [translationsForExport['th-dimensions']]: dimensions,
+                    [translationsForExport['th-qty-on-sheet']]: totalQuantity + (group.count > 1 ? ` (x${group.count})` : '')
+                });
+            });
+            
+            sheetNumber++;
+        });
+        
+        // إنشاء ورقة العمل
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        
+        // تحديد نطاق البيانات لإنشاء جدول منظم
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        
+        // إضافة نمط الجدول (مثل Ctrl+T في Excel)
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({r: 0, c: C});
+            if (!worksheet[cellAddress]) continue;
+            
+            // تنسيق رؤوس الأعمدة
+            worksheet[cellAddress].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "2C3E50" } },
+                alignment: { horizontal: "center" }
+            };
+        }
+        
+        // تنسيق باقي الخلايا
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                if (!worksheet[cellAddress]) continue;
+                
+                // تنسيق متناوب للصفوف لسهولة القراءة
+                if (R % 2 === 0) {
+                    worksheet[cellAddress].s = {
+                        fill: { fgColor: { rgb: "F5F7FA" } }
+                    };
+                }
+                
+                // محاذاة الأرقام إلى اليمين والنصوص إلى اليسار
+                if (C === 0 || C === 5) { // أعمدة الأرقام
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.alignment = { horizontal: "right" };
+                } else {
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.alignment = { horizontal: "left" };
+                }
+            }
+        }
+        
+        // ضبط عرض الأعمدة تلقائياً
+        worksheet['!cols'] = [
+            { wch: 12 }, // رقم اللوح
+            { wch: 15 }, // نوع الصلب
+            { wch: 12 }, // السمك
+            { wch: 20 }, // اسم القطعة
+            { wch: 15 }, // الأبعاد
+            { wch: 18 }  // الكمية على اللوح
+        ];
+        
+        // إضافة التصفية التلقائية (AutoFilter)
+        worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+        
+        // إنشاء المصنف وحفظ الملف
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, translationsForExport['summary-export-title']);
+        
+        // حفظ الملف مع التاريخ والوقت للحصول على اسم فريد
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+        XLSX.writeFile(workbook, `cutting_summary_${timestamp}.xlsx`);
+    };
+    
+    const exportStock = () => {
+        if (stockStatement.length === 0) {
+            showAlert('alert-no-plan');
+            return;
+        }
+        
+        const lang = isEnglish ? 'en' : 'ar';
+        const translationsForExport = translations[lang];
+        
+        // إنشاء البيانات للتصدير
+        const exportData = stockStatement.map(item => {
+            const stockCode = getStockCode(item.steelType, item.thickness);
+            const weight = item.totalWeight.toFixed(3);
+            
+            return {
+                [translationsForExport['th-stock-code']]: stockCode,
+                [translationsForExport['th-steel-type-stock']]: item.steelType,
+                [translationsForExport['th-thickness-stock']]: item.thickness,
+                [translationsForExport['th-length-stock']]: cuttingPlan[0]?.sheetLength || 0,
+                [translationsForExport['th-width-stock']]: cuttingPlan[0]?.sheetWidth || 0,
+                [translationsForExport['th-quantity-stock']]: item.sheets,
+                [translationsForExport['th-total-area']]: item.totalArea.toFixed(2),
+                [translationsForExport['th-weight']]: weight
+            };
+        });
+        
+        // إنشاء ورقة العمل
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        
+        // تحديد نطاق البيانات لإنشاء جدول منظم
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        
+        // إضافة نمط الجدول (مثل Ctrl+T في Excel)
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({r: 0, c: C});
+            if (!worksheet[cellAddress]) continue;
+            
+            // تنسيق رؤوس الأعمدة
+            worksheet[cellAddress].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "27AE60" } }, // لون أخضر لبيان الصرف
+                alignment: { horizontal: "center" }
+            };
+        }
+        
+        // تنسيق باقي الخلايا
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                if (!worksheet[cellAddress]) continue;
+                
+                // تنسيق متناوب للصفوف لسهولة القراءة
+                if (R % 2 === 0) {
+                    worksheet[cellAddress].s = {
+                        fill: { fgColor: { rgb: "F5F7FA" } }
+                    };
+                }
+                
+                // محاذاة الأرقام إلى اليمين والنصوص إلى اليسار
+                if (C >= 3) { // أعمدة الأرقام
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.alignment = { horizontal: "right" };
+                } else {
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.alignment = { horizontal: "left" };
+                }
+            }
+        }
+        
+        // ضبط عرض الأعمدة تلقائياً
+        worksheet['!cols'] = [
+            { wch: 15 }, // كود المخازن
+            { wch: 15 }, // نوع الصلب
+            { wch: 12 }, // السمك
+            { wch: 12 }, // الطول
+            { wch: 12 }, // العرض
+            { wch: 10 }, // العدد
+            { wch: 18 }, // المساحة الإجمالية
+            { wch: 15 }  // الوزن
+        ];
+        
+        // إضافة التصفية التلقائية (AutoFilter)
+        worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+        
+        // إنشاء المصنف وحفظ الملف
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, translationsForExport['stock-export-title']);
+        
+        // حفظ الملف مع التاريخ والوقت للحصول على اسم فريد
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+        XLSX.writeFile(workbook, `stock_statement_${timestamp}.xlsx`);
+    };
+    
+    const exportReturns = () => {
+        if (returnsStatement.length === 0) {
+            showAlert('no-waste');
+            return;
+        }
+        
+        const lang = isEnglish ? 'en' : 'ar';
+        const translationsForExport = translations[lang];
+        
+        // تجميع الفضلات حسب اللوح والأبعاد ونوع الصلب والسمك
+        const wasteGroups = new Map();
+        
+        returnsStatement.forEach(waste => {
+            const wasteKey = `${waste.sheetNumber}-${waste.steelType}-${waste.thickness}-${waste.length}-${waste.width}`;
+            
+            if (!wasteGroups.has(wasteKey)) {
+                wasteGroups.set(wasteKey, {
+                    sheetNumber: waste.sheetNumber,
+                    steelType: waste.steelType,
+                    thickness: waste.thickness,
+                    length: waste.length,
+                    width: waste.width,
+                    count: 0
+                });
+            }
+            
+            const group = wasteGroups.get(wasteKey);
+            group.count++;
+        });
+        
+        // إنشاء البيانات للتصدير
+        const exportData = Array.from(wasteGroups.values()).map(item => ({
+            [translationsForExport['th-sheet-num']]: item.sheetNumber,
+            [translationsForExport['th-steel-type-stock']]: item.steelType,
+            [translationsForExport['th-thickness-stock']]: item.thickness,
+            [translationsForExport['waste-length']]: item.length,
+            [translationsForExport['waste-width']]: item.width,
+            [translationsForExport['waste-count']]: item.count
+        }));
+        
+        // إنشاء ورقة العمل
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        
+        // تحديد نطاق البيانات لإنشاء جدول منظم
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        
+        // إضافة نمط الجدول (مثل Ctrl+T في Excel)
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({r: 0, c: C});
+            if (!worksheet[cellAddress]) continue;
+            
+            // تنسيق رؤوس الأعمدة
+            worksheet[cellAddress].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "E74C3C" } }, // لون أحمر لبيان الارتجاعات
+                alignment: { horizontal: "center" }
+            };
+        }
+        
+        // تنسيق باقي الخلايا
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                if (!worksheet[cellAddress]) continue;
+                
+                // تنسيق متناوب للصفوف لسهولة القراءة
+                if (R % 2 === 0) {
+                    worksheet[cellAddress].s = {
+                        fill: { fgColor: { rgb: "F5F7FA" } }
+                    };
+                }
+                
+                // محاذاة الأرقام إلى اليمين والنصوص إلى اليسار
+                if (C >= 3) { // أعمدة الأرقام
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.alignment = { horizontal: "right" };
+                } else {
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.alignment = { horizontal: "left" };
+                }
+            }
+        }
+        
+        // ضبط عرض الأعمدة تلقائياً
+        worksheet['!cols'] = [
+            { wch: 12 }, // رقم اللوح
+            { wch: 15 }, // نوع الصلب
+            { wch: 12 }, // السمك
+            { wch: 15 }, // طول الفضلة
+            { wch: 15 }, // عرض الفضلة
+            { wch: 12 }  // عدد التكرار
+        ];
+        
+        // إضافة التصفية التلقائية (AutoFilter)
+        worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+        
+        // إنشاء المصنف وحفظ الملف
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, translationsForExport['returns-export-title']);
+        
+        // حفظ الملف مع التاريخ والوقت للحصول على اسم فريد
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+        XLSX.writeFile(workbook, `returns_statement_${timestamp}.xlsx`);
+    };
+    
+    // --- THEME & LANGUAGE ---
+    const applyTranslations = () => {
+        const lang = isEnglish ? 'en' : 'ar';
+        const dir = isEnglish ? 'ltr' : 'rtl';
+        document.documentElement.lang = lang;
+        document.body.dir = dir;
+        Object.keys(translations.en).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                const translation = translations[lang][key] || translations.en[key];
+                if(element.placeholder !== undefined) element.placeholder = translation;
+                else element.textContent = translation;
+            }
+        });
+        document.getElementById('theme-text').textContent = isDarkMode ? translations[lang]['light-mode'] : translations[lang]['theme-text'];
+        updatePartsList();
+        updateSummaryTable();
+    };
+    
+    const toggleTheme = () => {
+        isDarkMode = !isDarkMode;
+        localStorage.setItem('darkMode', isDarkMode);
+        updateTheme();
+    };
+    
+    const updateTheme = () => {
+        document.body.classList.toggle('dark-mode', isDarkMode);
+        document.getElementById('theme-icon').textContent = isDarkMode ? '☀️' : '🌙';
+        const lang = isEnglish ? 'en' : 'ar';
+        document.getElementById('theme-text').textContent = isDarkMode ? translations[lang]['light-mode'] : translations[lang]['theme-text'];
+    };
+    
+    const toggleLanguage = () => {
+        isEnglish = !isEnglish;
+        localStorage.setItem('language', isEnglish ? 'en' : 'ar');
+        applyTranslations();
+    };
+    
+    // --- INITIALIZATION ---
+    function init() {
+        // Event Listeners
+        dom.themeToggle.addEventListener('click', toggleTheme);
+        dom.languageToggle.addEventListener('click', toggleLanguage);
+        dom.addPartBtn.addEventListener('click', addPart);
+        dom.clearPartsBtn.addEventListener('click', clearParts);
+        dom.generatePlanBtn.addEventListener('click', generateCuttingPlan);
+        dom.exportSummaryBtn.addEventListener('click', exportSummary);
+        dom.exportStockBtn.addEventListener('click', exportStock);
+        dom.exportReturnsBtn.addEventListener('click', exportReturns);
+        dom.excelFileInput.addEventListener('change', handleExcelFile);
+        
+        // Initial setup
+        updateTheme();
+        applyTranslations();
+        updatePartsList();
+        updateSummaryTable();
+        updateStats();
+    }
+    
+    init();
+});
+</script>
 </body>
 </html>
