@@ -1,6 +1,4 @@
 Sheet Metal Cutting Plan Optimizer
-App Screenshot
-(Replace with actual screenshot)
 
 Overview
 A web-based tool for optimizing sheet metal cutting plans to minimize waste and maximize material usage. The application implements a binary tree packing algorithm to efficiently arrange parts on metal sheets while respecting the physical constraints of the cutting equipment.
