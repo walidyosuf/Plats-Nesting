@@ -463,6 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'alert-fill-all': 'Please fill all fields with valid numbers.', 
             'alert-no-parts': 'Please add at least one part to generate a plan.', 
             'alert-no-plan': 'No cutting plan available to export.', 
+            'alert-max-length': 'Part length cannot exceed 3000mm due to cutter width limitation.', 
             'excel-loaded': 'Parts loaded successfully from Excel file.', 
             'excel-error': 'Error reading Excel file. Ensure columns are named correctly (Name, SteelType, Quantity, Length, Width, Thickness).', 
             'sheet': 'Sheet', 
@@ -533,6 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'alert-fill-all': 'يرجى ملء جميع الحقول بأرقام صحيحة.', 
             'alert-no-parts': 'يرجى إضافة قطعة واحدة على الأقل لإنشاء الخطة.', 
             'alert-no-plan': 'لا توجد خطة قطع متاحة للتصدير.', 
+            'alert-max-length': 'طول القطعة لا يمكن أن يتجاوز 3000 مم بسبب قيود عرض المقص.', 
             'excel-loaded': 'تم تحميل القطع بنجاح من ملف Excel.', 
             'excel-error': 'خطأ في قراءة ملف Excel. تأكد من تسمية الأعمدة بشكل صحيح (Name, SteelType, Quantity, Length, Width, Thickness).', 
             'sheet': 'لوح', 
@@ -678,7 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UI & LOGIC FUNCTIONS ---
     const showAlert = (textKey) => {
         const lang = isEnglish ? 'en' : 'ar';
-        dom.modalText.textContent = translations[lang][textKey];
+        dom.modalText.textContent = translations[lang][textKey] || textKey;
         dom.modalConfirm.style.display = 'none';
         dom.modalCancel.textContent = 'Ok';
         dom.modal.classList.add('visible');
@@ -746,6 +748,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        // التحقق من أن الطول لا يتجاوز 3000 ملم (قيود المقص)
+        if (length > 3000) {
+            showAlert('alert-max-length');
+            return;
+        }
+        
         parts.push({ name, steelType, quantity, length, width, thickness });
         updatePartsList();
         
@@ -784,17 +792,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        const sheetLength = parseFloat(document.getElementById('sheet-length').value);
-        const sheetWidth = parseFloat(document.getElementById('sheet-width').value);
+        const sheetLength = parseFloat(document.getElementById('sheet-length').value); // 6000 مم
+        const sheetWidth = parseFloat(document.getElementById('sheet-width').value); // 1500 مم
         const margin = 0; // إلغاء هامش القطع
         const allowRotation = document.getElementById('allow-rotation').checked;
+        
+        // المقص يقطع العرض أولاً (1500 مم) وليس الطول (6000 مم)
+        // لذلك سنقوم بتبديل الأبعاد في الخوارزمية
         
         const allIndividualParts = [];
         parts.forEach(part => {
             for (let i = 0; i < part.quantity; i++) {
                 allIndividualParts.push({ ...part,
-                    w: part.length + margin,
-                    h: part.width + margin,
+                    // تبديل الأبعاد لأن القطع سيتم على العرض أولاً
+                    w: part.width + margin,   // العرض يصبح الطول في التقطيع
+                    h: part.length + margin,  // الطول يصبح العرض في التقطيع
                     original_w: part.length,
                     original_h: part.width,
                     area: (part.length + margin) * (part.width + margin)
@@ -816,12 +828,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         for (const groupKey in partsByGroup) {
             let partsToPack = partsByGroup[groupKey];
-            partsToPack.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.area - a.area);
+            // ترتيب القطع حسب البعد الأكبر (العرض أولاً)
+            partsToPack.sort((a, b) => Math.max(b.h, b.w) - Math.max(a.h, a.w) || b.area - a.area);
             const [thickness, steelType] = groupKey.split('-');
             let sheetIndex = 1;
             
             while(partsToPack.length > 0) {
-                const packer = new Packer(sheetLength, sheetWidth);
+                // المقص يقطع العرض أولاً، لذلك نبدل أبعاد اللوح
+                const packer = new Packer(sheetWidth, sheetLength); // تبديل الأبعاد هنا
                 const remainingParts = [];
                 
                 if (allowRotation) {
@@ -1058,7 +1072,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     length: parseFloat(row[headerMap.length]),
                     width: parseFloat(row[headerMap.width]),
                     thickness: parseFloat(row[headerMap.thickness])
-                })).filter(p => p.name && p.steelType && !isNaN(p.quantity) && !isNaN(p.length) && !isNaN(p.width) && !isNaN(p.thickness));
+                })).filter(p => p.name && p.steelType && !isNaN(p.quantity) && !isNaN(p.length) && !isNaN(p.width) && !isNaN(p.thickness) && p.length <= 3000);
                 if(newParts.length > 0) {
                     parts = parts.concat(newParts);
                     updatePartsList();
